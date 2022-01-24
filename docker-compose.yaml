@@ -1,0 +1,52 @@
+version: '3.4'
+
+services:
+
+    mongodb:
+        image: mongo
+        container_name: mongodb
+        hostname: mongodb
+        #user: "root"
+        volumes:
+
+            - ./mongod.conf:/etc/mongod.conf
+            - ./initdb.d/:/docker-entrypoint-initdb.d/
+            - ./data/db/:/data/db/
+            - ./keyfile:/keyfile
+            - ./data/log:/data/log
+        env_file:
+            - .env
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+            MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+            MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+            MONGO_REPLICA_SET_NAME: ${MONGO_REPLICA_SET_NAME}
+        ports:
+            - 20004:27017
+        restart: always
+        healthcheck:
+            test:
+             [
+              "CMD",
+              "mongo",
+              "admin",
+              "-u",
+              "root",
+              "-p",
+              "root",
+              "--quiet",
+              "--eval",
+              'rs.initiate( { _id : "rs0",members: [{_id:0,host:"mongodb:27017"}]})',
+             ]
+            #test: test $$(echo "rs.initiate().ok || rs.status().ok" | mongo -u root -p root  --quiet) -eq 1
+            interval: 10s
+            start_period: 30s
+        entrypoint:
+            - bash
+            - -c
+            - |
+                cp /keyfile ./keyfie
+                chmod 400 /keyfile
+                chown 999:999 /keyfile
+                exec docker-entrypoint.sh $$@
+        command: "mongod --bind_ip_all --replSet ${MONGO_REPLICA_SET_NAME} --keyFile /keyfile"
